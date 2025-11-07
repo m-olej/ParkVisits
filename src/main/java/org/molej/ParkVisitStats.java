@@ -49,12 +49,12 @@ public class ParkVisitStats extends Configured implements Tool {
         job.setCombinerClass(ParkVisitsCombiner.class);
 
         // Mapper io
-        job.setMapOutputKeyClass(Text.class);
-        job.setMapOutputValueClass(Text.class);
+        job.setMapOutputKeyClass(Text.class); // ("key")
+        job.setMapOutputValueClass(Text.class); // ("count,sum")
 
         // Reducer io
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(DoubleWritable.class);
+        job.setOutputKeyClass(Text.class); // ("parkId,date")
+        job.setOutputValueClass(Text.class); // ("visits_count\tavg_group_size")
 
         FileInputFormat.setInputPaths(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
@@ -79,6 +79,10 @@ public class ParkVisitStats extends Configured implements Tool {
 
                 String line = lineText.toString();
                 String[] fields = line.split(",");
+
+                if (fields.length < 6) {
+                    throw new Exception("Line has too few fields.");
+                }
 
                 // 1. Extract required fields
                 String parkId = fields[1];
@@ -129,7 +133,7 @@ public class ParkVisitStats extends Configured implements Tool {
                         totalVisitCount += Long.parseLong(fields[0]);
                         totalVisitorCount += Long.parseLong(fields[1]);
                     } else {
-                        throw new Exception("Invalid format");
+                        throw new Exception("Invalid format.");
                     }
                 }
 
@@ -144,10 +148,10 @@ public class ParkVisitStats extends Configured implements Tool {
         }
     }
 
-    public static class ParkVisitsReducer extends Reducer<Text, Text, Text, DoubleWritable> {
+    public static class ParkVisitsReducer extends Reducer<Text, Text, Text, Text> {
 
         private static final Logger LOG = LoggerFactory.getLogger(ParkVisitsReducer.class);
-        private final DoubleWritable resultValue = new DoubleWritable();
+        private final Text resultValue = new Text();
 
         @Override
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException{
@@ -179,14 +183,9 @@ public class ParkVisitStats extends Configured implements Tool {
                 String date = key_fields[1];
 
                 // 3. Return result
-                Text resultKeyAvg = new Text("Average group size at " + parkId + " on the day " + date + " was: ");
-                resultValue.set(avgGroupSize);
+                Text resultKeyAvg = new Text( parkId + "\t" + date);
+                resultValue.set(new Text(avgGroupSize + "\t" + totalVisitorCount));
                 context.write(resultKeyAvg, resultValue);
-
-                Text resultKeyTotal = new Text("Total amount of visits at " + parkId + " on the day " + date + " was: ");
-                resultValue.set(totalVisitCount);
-                context.write(resultKeyTotal, resultValue);
-
             } catch (Exception e) {
                 context.getCounter(VisitCounters.REDUCER_ERROR).increment(1);
 
