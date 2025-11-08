@@ -72,7 +72,8 @@ DeviationStats AS (
         total_visits,
         avg_group_size,
 
-        AVG(total_visits) OVER (PARTITION BY nature_types) AS avg_visits_for_type
+        AVG(total_visits) OVER (PARTITION BY nature_types) AS avg_region_visits
+        SUM(total_visits) OVER (PARTITION BY nature_types) AS total_region_visits
 
     FROM
         RegionStats
@@ -86,6 +87,6 @@ SELECT
     total_visits,
     avg_group_size,
 
-    (total_visits - avg_visits_for_type) AS visits_deviation
+    (total_region_visits - avg_region_visits) AS visits_deviation
 FROM
     DeviationStats;
